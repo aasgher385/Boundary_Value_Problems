@@ -6,14 +6,16 @@
 
 # Importing Packages
 import Pkg
-Pkg.import("Plots")
-Pkg.import("LaTeXStrings")
-Pkg.import("LinearAlgebra")
-Pkg.import("DifferentialEquations")
+
+Pkg.add("Plots")
+Pkg.add("LaTeXStrings")
+Pkg.add("LinearAlgebra")
+Pkg.add("DifferentialEquations")
 
 
 # Loading Packages
 using DifferentialEquations
+using BoundaryValueDiffEq
 using LinearAlgebra
 using LaTeXStrings
 using Plots
@@ -67,8 +69,27 @@ y_exact = c1*x .+ c2./x.^2 -(3/10).*sin.(log.(x))- (1/10).*cos.(log.(x))
 # Infinity norm of y-y_exact
 error = norm(y-y_exact,Inf)
 
-plot(sol.t,y,linewidth=2.0,xlabel=L"x",ylabel=L"y(x)",label="Numerical Solution", legend=:right)
-scatter!(x,y_exact,linewidth=2.0,xlabel=L"x",ylabel=L"y(x)",label="Exact Solution", legend=:right)
+
+# Comparison with DifferentialEquations.jl
+
+function DEqs!(du,u,p,t)
+    θ  = u[1]
+    dθ = u[2]
+    du[1] = dθ
+    du[2] = -(2/t)*dθ+2*θ/t^2+sin(log(t))/t^2    
+end
+
+function bc2!(residual, u, p, t) 
+    residual[1] = u[1][1] - 1.0 # u[1]-1.0=0.0
+    residual[2] = u[end][1] - 2.0 # u[2]-2.0=0.0
+end
+
+bvp2 = TwoPointBVProblem(DEqs!, bc2!, [1.0,2.0], tspan)
+sol2 = solve(bvp2, MIRK4(), dt=0.05) 
 
 
-
+# Comparative Plots 
+plot(sol.t,y,linewidth=2.0,xlabel=L"x",ylabel=L"y(x)",label="Numerical Solution via Linear Shooting Method", legend=:topleft)
+plot!(sol2.t,sol2[1,:], markershape=:star, markerstrokecolor=:red, markerstrokewidth=3,
+	label= "BoundaryValueDiffEq.jl",markersize=6)
+scatter!(x,y_exact,linewidth=2.0,xlabel=L"x",ylabel=L"y(x)",label="Exact Solution", legend=:topleft)
